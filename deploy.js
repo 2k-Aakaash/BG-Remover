@@ -10,10 +10,8 @@ console.log("🚀 Starting deployment from dev branch...\n")
 
 let tempDistPath = null
 
-let tempDistPath = null
-
 try {
-  // Step 1: Ensure on dev branch
+  // Ensure on dev
   console.log("📍 Checking current branch...")
   let currentBranch = execSync("git branch --show-current").toString().trim()
 
@@ -22,18 +20,17 @@ try {
     execSync("git checkout dev", {stdio: "inherit"})
   }
 
-  // Step 2: Stash any existing changes (before build)
-  console.log("📦 Stashing existing changes...")
+  // Stash changes
+  console.log("📦 Stashing changes...")
   execSync('git stash push -u -m "temp stash before deploy"', {
     stdio: "inherit",
   })
 
-  // Step 3: Build
+  // Build
   console.log("📦 Building project...")
   execSync("npx vite build", {stdio: "inherit"})
-  execSync("npx vite build", {stdio: "inherit"})
 
-  // Step 4: Copy dist to temp folder
+  // Copy dist to temp
   console.log("📦 Copying dist to temporary location...")
   const distPath = path.join(__dirname, "dist")
   tempDistPath = path.join(__dirname, "temp-dist")
@@ -42,24 +39,18 @@ try {
     fs.rmSync(tempDistPath, {recursive: true, force: true})
   fs.cpSync(distPath, tempDistPath, {recursive: true})
 
-  // Step 5: Delete dist folder from dev (so git checkout doesn't complain)
-  console.log("🗑️  Removing dist folder from dev branch...")
+  // Remove dist from dev branch to avoid conflicts
+  console.log("🗑️ Removing dist folder from dev...")
   fs.rmSync(distPath, {recursive: true, force: true})
 
-  // Step 6: Switch to main
+  // Switch to main
   console.log("🔄 Switching to main branch...")
   execSync("git checkout main", {stdio: "inherit"})
 
-  // Step 7: Clean main branch
+  // Clean main
   console.log("🧹 Cleaning main branch...")
   const files = fs.readdirSync(".")
   for (const file of files) {
-    if (
-      file !== ".git" &&
-      file !== "deploy.js" &&
-      file !== "node_modules" &&
-      file !== "temp-dist"
-    ) {
     if (
       file !== ".git" &&
       file !== "deploy.js" &&
@@ -70,18 +61,17 @@ try {
     }
   }
 
-  // Step 8: Copy build files
+  // Copy build files
   console.log("📋 Copying build files to main...")
   const tempFiles = fs.readdirSync(tempDistPath)
   for (const file of tempFiles) {
     fs.cpSync(path.join(tempDistPath, file), file, {recursive: true})
   }
 
-  // Step 9: Add .nojekyll
   fs.writeFileSync(".nojekyll", "")
 
-  // Step 10: Commit & Push
-  console.log("📤 Committing & pushing...")
+  // Commit & Push
+  console.log("📤 Committing & pushing to main...")
   execSync("git add .", {stdio: "inherit"})
   execSync(
     `git commit -m "chore: deploy new build - ${new Date().toISOString()}"`,
@@ -89,23 +79,29 @@ try {
   )
   execSync("git push origin main --force", {stdio: "inherit"})
 
-  console.log("\n✅ Deployment completed successfully! 🎉")
+  console.log("\n✅ Deployment to main completed successfully! 🎉")
 } catch (error) {
   console.error("\n❌ Deployment failed:")
   console.error(error.message)
   process.exit(1)
 } finally {
-  // Cleanup
+  // Cleanup temp folder
   if (tempDistPath && fs.existsSync(tempDistPath)) {
     fs.rmSync(tempDistPath, {recursive: true, force: true})
   }
 
-  // Return to dev
+  // Return to dev branch
   try {
     console.log("\n🔄 Returning to dev branch...")
     execSync("git checkout dev", {stdio: "inherit"})
-    execSync("git stash pop", {stdio: "inherit"})
+
+    // Try to restore stash safely
+    try {
+      execSync("git stash pop", {stdio: "inherit"})
+    } catch (stashError) {
+      console.log("Note: Stash pop had conflicts or no stash.")
+    }
   } catch (e) {
-    console.log("Note: No stash to restore.")
+    console.log("Warning: Could not return to dev branch automatically.")
   }
 }
