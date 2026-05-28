@@ -5,8 +5,8 @@
   "type": "module",
 "scripts": {
   "dev": "vite",
-  "build": "node deploy.js",
-  "build:only": "vite build",
+  "build": "vite build",
+  "deploy": "node deploy.js",
   "lint": "eslint .",
   "preview": "vite preview"
 },

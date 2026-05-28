@@ -1,89 +1,69 @@
 import {execSync} from "child_process"
 import fs from "fs"
 import path from "path"
+import {fileURLToPath} from "url"
 
-const rootPath = process.cwd()
-const tempDist = path.join(rootPath, "__temp_dist__")
-const distPath = path.join(rootPath, "dist")
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+
+console.log("🚀 Starting deployment from dev branch...\n")
 
 try {
-  console.log("Building project...")
-  execSync("vite build", {stdio: "inherit"})
+  // Step 1: Ensure we're on dev branch
+  console.log("📍 Checking current branch...")
+  let currentBranch = execSync("git branch --show-current").toString().trim()
 
-  console.log("Preparing temp dist...")
-
-  if (fs.existsSync(tempDist)) {
-    fs.rmSync(tempDist, {recursive: true, force: true})
+  if (currentBranch !== "dev") {
+    console.log(`🔄 Switching to dev branch... (current: ${currentBranch})`)
+    execSync("git checkout dev", {stdio: "inherit"})
   }
 
-  fs.cpSync(distPath, tempDist, {
-    recursive: true,
-    force: true,
-  })
+  // Step 2: Build the project
+  console.log("📦 Building project...")
+  execSync("npm run build", {stdio: "inherit"})
 
-  console.log("Stashing changes...")
-  execSync('git stash push --include-untracked -m "temp-deploy"', {
-    stdio: "inherit",
-  })
+  // Step 3: Switch to main branch
+  console.log("🔄 Switching to main branch...")
+  execSync("git checkout main", {stdio: "inherit"})
 
-  console.log("Switching to main branch...")
-  execSync("git checkout main", {
-    stdio: "inherit",
-  })
-
-  console.log("Removing old files...")
-
-  try {
-    execSync("git rm -r .", {
-      stdio: "inherit",
-    })
-  } catch {
-    console.log("No tracked files to remove.")
+  // Step 4: Clean main branch (keep only .git and deploy.js)
+  console.log("🧹 Cleaning main branch...")
+  const files = fs.readdirSync(".")
+  for (const file of files) {
+    if (file !== ".git" && file !== "deploy.js" && file !== "node_modules") {
+      fs.rmSync(file, {recursive: true, force: true})
+    }
   }
 
-  execSync("git clean -fd", {
-    stdio: "inherit",
-  })
+  // Step 5: Copy dist contents to root
+  console.log("📋 Copying build files...")
+  const distPath = path.join(__dirname, "dist")
 
-  console.log("Copying build files...")
+  if (!fs.existsSync(distPath)) {
+    throw new Error("❌ dist folder not found after build!")
+  }
 
-  fs.cpSync(tempDist, rootPath, {
-    recursive: true,
-    force: true,
-  })
+  const distFiles = fs.readdirSync(distPath)
+  for (const file of distFiles) {
+    fs.cpSync(path.join(distPath, file), file, {recursive: true})
+  }
 
-  console.log("Removing temp folder...")
-  fs.rmSync(tempDist, {
-    recursive: true,
-    force: true,
-  })
+  // Step 6: Create .nojekyll for GitHub Pages
+  fs.writeFileSync(".nojekyll", "")
 
-  console.log("Adding files...")
-  execSync("git add .", {
-    stdio: "inherit",
-  })
+  // Step 7: Commit and push
+  console.log("📤 Committing & pushing...")
+  execSync("git add .", {stdio: "inherit"})
+  execSync(
+    `git commit -m "chore: deploy new build - ${new Date().toISOString()}"`,
+    {stdio: "inherit"},
+  )
+  execSync("git push origin main --force", {stdio: "inherit"})
 
-  console.log("Commiting...")
-  execSync('git commit -m "Deploy build"', {
-    stdio: "inherit",
-  })
-
-  console.log("Pushing...")
-  execSync("git push origin main", {
-    stdio: "inherit",
-  })
-
-  console.log("Returning to dev...")
-  execSync("git checkout dev", {
-    stdio: "inherit",
-  })
-
-  console.log("Restoring stash...")
-  execSync("git stash pop", {
-    stdio: "inherit",
-  })
-
-  console.log("Deployment completed!")
-} catch (err) {
-  console.error(err)
+  console.log("\n✅ Deployment completed successfully! 🎉")
+  console.log("Your main branch now contains only the built static files.")
+} catch (error) {
+  console.error("\n❌ Deployment failed:")
+  console.error(error.message)
+  process.exit(1)
 }
