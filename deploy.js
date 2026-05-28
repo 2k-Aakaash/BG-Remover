@@ -10,6 +10,8 @@ console.log("🚀 Starting deployment from dev branch...\n")
 
 let tempDistPath = null
 
+let tempDistPath = null
+
 try {
   // Step 1: Ensure on dev branch
   console.log("📍 Checking current branch...")
@@ -28,6 +30,7 @@ try {
 
   // Step 3: Build
   console.log("📦 Building project...")
+  execSync("npx vite build", {stdio: "inherit"})
   execSync("npx vite build", {stdio: "inherit"})
 
   // Step 4: Copy dist to temp folder
@@ -51,6 +54,12 @@ try {
   console.log("🧹 Cleaning main branch...")
   const files = fs.readdirSync(".")
   for (const file of files) {
+    if (
+      file !== ".git" &&
+      file !== "deploy.js" &&
+      file !== "node_modules" &&
+      file !== "temp-dist"
+    ) {
     if (
       file !== ".git" &&
       file !== "deploy.js" &&
